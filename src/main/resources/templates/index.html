@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>图像去模糊</title>
+    <link rel="stylesheet" type="text/css" media="all" th:href="@{/css/login.css}"/>
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+</head>
+
+<body th:style="'background-image: url(/img/starve.jpg)'">
+
+
+<h1>选择图片并提交</h1>
+<form th:action="@{/deblur/upload}" method="post" enctype="multipart/form-data">
+    <input type="file" name="imageFile" accept="image/*">
+    <br/>
+    <input type="submit" value="提交">
+</form>
+<div>
+    <button th:onclick="doDeblur()">开始去模糊</button>
+</div>
+
+
+
+</body>
+
+<script>
+    function doDeblur() {
+        $.ajax({
+            url:"/deblur/doDeblur",
+            type:"GET",
+            // data:JSON.stringify(product),
+            contentType: "application/json;charset=UTF-8",
+            accept : "*/*",
+            success : function () {
+                console.log("done deblur");
+            }
+        });
+    }
+</script>
+<script>
+    var myFunc = function(){
+        $.ajax({
+            url:"/deblur/getConsole",
+            type:"POST",
+            data:String,
+            contentType: "application/json;charset=UTF-8",
+            accept : "*/*",
+            success : function (res) {
+                console.log(res);
+                // document.getElementById('text').innerHTML += res;
+            }
+        });
+        var obj = document.getElementById('text');
+        obj.scrollTop = obj.scrollHeight;
+    }
+    setInterval(myFunc,1000)
+</script>
+</html>
