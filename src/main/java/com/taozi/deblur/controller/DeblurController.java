@@ -58,18 +58,11 @@ public class DeblurController {
     @PostMapping("/upload")
     @ResponseBody
     @CrossOrigin
-    public String uploadImage(@RequestParam("imageFile") MultipartFile imageFile) throws IOException {
-        String blurDir = "/stdStorage/taozi/deblur_sys/img/blur/";
-        Process process;
-        String[] shell = {"rm", "-rf", blurDir + "*"};
-        process = Runtime.getRuntime().exec(shell);
-        process.getOutputStream().close();
-        commander.println("rm -rf /stdStorage/taozi/deblur_sys/img/blur/*");
+    public String uploadImage(@RequestParam("imageFile") MultipartFile imageFile, @RequestParam("taskId") String taskId) throws IOException {
+        logger.info("tsakId:" + taskId);
         logger.info("文件名：" + imageFile.getOriginalFilename());
+        String fileName = deblurService.uploadImage(imageFile, taskId);
         logger.info("文件大小：" + imageFile.getSize() + " bytes");
-        String fileName = System.currentTimeMillis() + "_" + imageFile.getOriginalFilename();
-        Path filePath = Paths.get(blurDir + fileName);
-        Files.copy(imageFile.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
         logger.info("图片上传成功");
         return fileName;
     }
@@ -80,7 +73,7 @@ public class DeblurController {
     @PostMapping("/doDeblur")
     @ResponseBody
     @CrossOrigin
-    public List<String> doDeblur(@RequestParam("gpuNum") int gpuNum, @RequestParam("imgName") String imgName) throws IOException {
+    public List<String> doDeblur(@RequestParam("gpuNum") int gpuNum, @RequestParam("imgName") String imgName, @RequestParam("taskId") String taskId) throws IOException {
         String key = "gpu" + gpuNum;
         Boolean absent = redisTemplate.opsForValue().setIfAbsent(key, 1);
         if (!absent) {
@@ -88,7 +81,25 @@ public class DeblurController {
         }
         logger.info(key + "已加锁");
         redisTemplate.expire(key, 30000, TimeUnit.MILLISECONDS);
-        return deblurService.doDeblur(gpuNum, imgName);
+        List<String> res = deblurService.doDeblur(gpuNum, imgName, taskId);
+//        commander.println("rm -rf /stdStorage/taozi/deblur_sys/img/blur/*");
+        return res;
+    }
+
+    @PostMapping("/doDeblurAll")
+    @ResponseBody
+    @CrossOrigin
+    public Boolean doDeblurAll(@RequestParam("gpuNum") int gpuNum, @RequestParam("taskId") String taskId) throws IOException {
+        String key = "gpu" + gpuNum;
+        Boolean absent = redisTemplate.opsForValue().setIfAbsent(key, 1);
+        if (!absent) {
+            return null;
+        }
+        logger.info(key + "已加锁");
+        redisTemplate.expire(key, 30000, TimeUnit.MILLISECONDS);
+        Boolean res = deblurService.doDeblurAll(gpuNum, taskId);
+//        commander.println("rm -rf /stdStorage/taozi/deblur_sys/img/blur/*");
+        return res;
     }
 
 
@@ -109,7 +120,7 @@ public class DeblurController {
     @CrossOrigin
     public Boolean testRedis(@RequestParam("gpuNum") int gpuNum) {
         String key = "gpu" + gpuNum;
-        logger.info("释放锁"+key);
+        logger.info("释放锁" + key);
         return redisTemplate.delete(key);
     }
 
@@ -133,13 +144,61 @@ public class DeblurController {
     /**
      * 需和doDeblur使用同一块cpu
      * img的指标和图片异步返回，同时进行
-     * */
+     */
     @PostMapping("/getImginfo")
     @ResponseBody
     @CrossOrigin
-    public String[] getImginfo(@RequestParam("gpuNum") int gpuNum, @RequestParam("imgName") String imgName) throws JSchException, IOException {
-        String imgValue = evaService.getImgValue(imgName, gpuNum);
+    public String[] getImginfo(@RequestParam("gpuNum") int gpuNum, @RequestParam("imgName") String imgName, @RequestParam("taskId") String taskId) throws JSchException, IOException {
+        logger.info("getImginfo:\t" + imgName + "\t" + taskId);
+        String imgValue = evaService.getImgValue(imgName, gpuNum, taskId);
         return imgValue.split(",");
+    }
+
+    @PostMapping("/getImgDisplay")
+    @ResponseBody
+    @CrossOrigin
+    public String[] getImgDisplay(@RequestParam("imgName") String imgName, @RequestParam("taskId") String taskId) {
+        String time = String.valueOf(redisTemplate.opsForValue().get(imgName));
+        String[] res = {"http://202.115.17.206:8081/" + taskId + "/blur/" + imgName, "http://202.115.17.206:8081/" + taskId + "/sharp/" + imgName, time};
+        logger.info("redis key: " + imgName + "\tvalue: " + time);
+        return res;
+    }
+
+
+    @PostMapping("/deleteTask")
+    @ResponseBody
+    @CrossOrigin
+    public Boolean deleteTask(@RequestParam("taskId") String taskId) throws IOException {
+        String taskPath = "/stdStorage/taozi/deblur_sys/img/" + taskId;
+        Process process = null;
+        String[] shell = {"rm", "-rf", taskPath};
+        process = Runtime.getRuntime().exec(shell);
+        process.getOutputStream().close();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        String line = "";
+        while (null != (line = reader.readLine())) {
+            logger.info(line);
+        }
+        logger.info(taskId + "文件夹已删除");
+        return true;
+    }
+
+    @PostMapping("/deleteImg")
+    @ResponseBody
+    @CrossOrigin
+    public Boolean deleteImg(@RequestParam("taskId") String taskId, @RequestParam("imgName") String imgName) throws IOException {
+        String taskPath = "/stdStorage/taozi/deblur_sys/img/" + taskId + "/" + imgName;
+        Process process = null;
+        String[] shell = {"rm", "-rf", taskPath};
+        process = Runtime.getRuntime().exec(shell);
+        process.getOutputStream().close();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        String line = "";
+        while (null != (line = reader.readLine())) {
+            logger.info(line);
+        }
+        logger.info(taskId + "/" + imgName + "已删除");
+        return true;
     }
 
 }

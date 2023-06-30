@@ -17,9 +17,9 @@ public class EvaService {
     @Autowired
     private PrintStream commander;
 
-    public String getImgValue(String imgName, int gpuNum) throws IOException, JSchException {
+    public String getImgValue(String imgName, int gpuNum, String taskId) throws IOException, JSchException {
         Process process = null;
-        String[] shell = {"/stdStorage/taozi/deblur_sys/src/main/java/com/taozi/deblur/util/getValue.sh", imgName, "" + gpuNum};
+        String[] shell = {"/stdStorage/taozi/deblur_sys/src/main/java/com/taozi/deblur/util/getValue.sh", imgName, "" + gpuNum, taskId};
         process = Runtime.getRuntime().exec(shell);
         process.getOutputStream().close();
         BufferedReader rb = new BufferedReader(new InputStreamReader(process.getInputStream()));
