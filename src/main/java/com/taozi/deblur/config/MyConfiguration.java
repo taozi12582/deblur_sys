@@ -6,9 +6,12 @@ import com.jcraft.jsch.Session;
 import com.taozi.deblur.util.CentosUtil;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.web.servlet.MultipartConfigFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.util.unit.DataSize;
 
+import javax.servlet.MultipartConfigElement;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -51,5 +54,14 @@ public class MyConfiguration {
         commander.println("cd /stdStorage/lx/trial/srndeblur/srndeblur");
         return commander;
     }
+
+    @Bean
+    public MultipartConfigElement multipartConfigElement(){
+        MultipartConfigFactory factory = new MultipartConfigFactory();
+        factory.setMaxFileSize(DataSize.parse("200MB"));
+        factory.setMaxRequestSize(DataSize.parse("200MB"));
+        return factory.createMultipartConfig();
+    }
+
 
 }

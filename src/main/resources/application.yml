@@ -25,6 +25,8 @@ spring:
 
 server:
   port: 8081
+  imgServerPath: /stdStorage/taozi/deblur_sys/img/
+  shServerPath: /stdStorage/taozi/deblur_sys/src/main/java/com/taozi/deblur/util/
 
 centos:
   ip: 202.115.17.206

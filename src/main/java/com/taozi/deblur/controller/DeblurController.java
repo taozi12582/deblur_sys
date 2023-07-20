@@ -3,7 +3,6 @@ package com.taozi.deblur.controller;
 import com.jcraft.jsch.Channel;
 import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
-import com.taozi.deblur.pojo.ImgInfo;
 import com.taozi.deblur.service.DeblurService;
 import com.taozi.deblur.service.EvaService;
 import com.taozi.deblur.service.GPUService;
@@ -16,10 +15,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -67,6 +62,26 @@ public class DeblurController {
         return fileName;
     }
 
+    @PostMapping("/uploadVideo")
+    @ResponseBody
+    @CrossOrigin
+    public String uploadVideo(@RequestParam("videoFile") MultipartFile videoFile, @RequestParam("taskId") String taskId) throws IOException {
+        logger.info("tsakId:" + taskId);
+        logger.info("文件名：" + videoFile.getOriginalFilename());
+        String fileName = deblurService.uploadVedio(videoFile, taskId);
+        logger.info("文件大小：" + videoFile.getSize() + " bytes");
+        logger.info("视频上传成功");
+        return fileName;
+    }
+
+    @PostMapping("/v2img")
+    @ResponseBody
+    @CrossOrigin
+    public boolean changeVideo(@RequestParam("videoName") String videoName, @RequestParam("taskId") String taskId) throws IOException {
+        deblurService.changeVideo(videoName, taskId);
+        return true;
+    }
+
     /**
      * 图像去模糊
      */
@@ -82,14 +97,15 @@ public class DeblurController {
         logger.info(key + "已加锁");
         redisTemplate.expire(key, 30000, TimeUnit.MILLISECONDS);
         List<String> res = deblurService.doDeblur(gpuNum, imgName, taskId);
-//        commander.println("rm -rf /stdStorage/taozi/deblur_sys/img/blur/*");
         return res;
     }
 
     @PostMapping("/doDeblurAll")
     @ResponseBody
     @CrossOrigin
-    public Boolean doDeblurAll(@RequestParam("gpuNum") int gpuNum, @RequestParam("taskId") String taskId) throws IOException {
+    public Boolean doDeblurAll(@RequestParam("gpuNum") int gpuNum, @RequestParam("taskId") String taskId,
+                               @RequestParam(value = "isVideo", defaultValue = "false") boolean isVideo,
+                               @RequestParam(value = "frame", defaultValue = "60") String frame) throws IOException {
         String key = "gpu" + gpuNum;
         Boolean absent = redisTemplate.opsForValue().setIfAbsent(key, 1);
         if (!absent) {
@@ -97,8 +113,30 @@ public class DeblurController {
         }
         logger.info(key + "已加锁");
         redisTemplate.expire(key, 30000, TimeUnit.MILLISECONDS);
-        Boolean res = deblurService.doDeblurAll(gpuNum, taskId);
-//        commander.println("rm -rf /stdStorage/taozi/deblur_sys/img/blur/*");
+        Boolean res = deblurService.doDeblurAll(gpuNum, taskId, isVideo);
+        if (isVideo) {
+            deblurService.makeVideo(taskId, Float.parseFloat(frame));
+        }
+        return res;
+    }
+
+
+    /**
+     * type 0: ir
+     * type 1: vis
+     **/
+    @PostMapping("/datasetDeblur")
+    @ResponseBody
+    @CrossOrigin
+    public Boolean datasetDeblur(@RequestParam("gpuNum") int gpuNum, @RequestParam("taskId") String taskId, @RequestParam("nameList") List<String> nameList, @RequestParam("type") Integer type) throws IOException {
+        String key = "gpu" + gpuNum;
+        Boolean absent = redisTemplate.opsForValue().setIfAbsent(key, 1);
+        if (!absent) {
+            return null;
+        }
+        logger.info(key + "已加锁");
+        redisTemplate.expire(key, 30000, TimeUnit.MILLISECONDS);
+        Boolean res = deblurService.datasetDeblur(gpuNum, taskId, nameList, type);
         return res;
     }
 
@@ -199,6 +237,19 @@ public class DeblurController {
         }
         logger.info(taskId + "/" + imgName + "已删除");
         return true;
+    }
+
+
+    /**
+     * imgName 需全名
+     */
+    @PostMapping("/showDemo")
+    @ResponseBody
+    @CrossOrigin
+    public String[] showDemo(@RequestParam("gpuNum") int gpuNum, @RequestParam("imgName") String imgName) throws JSchException, IOException {
+        logger.info("showDemo:\t" + imgName);
+        String imgValue = evaService.getImgValue(imgName, gpuNum, "demoTruth");
+        return imgValue.split(",");
     }
 
 }
