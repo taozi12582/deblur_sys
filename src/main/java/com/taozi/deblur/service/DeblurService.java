@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -14,6 +15,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 @Service
@@ -28,6 +30,8 @@ public class DeblurService {
     private String imgServerPath;
     @Value("${server.shServerPath}")
     private String shServerPath;
+    @Value("${server.imgTomcatPath}")
+    private String imgTomcatPath;
 
     public List<String> doDeblur(int gpuNum, String imgName, String taskId) throws IOException {
         String blurDir = imgServerPath + taskId + "/blur/";
@@ -143,19 +147,29 @@ public class DeblurService {
         return doShell(shell);
     }
 
-    public Boolean datasetDeblur(int gpuNum, String taskId, List<String> nameList, Integer type) throws IOException {
-        String originDir = imgServerPath + "datasets/motion/" + (type == 0 ? "ir" : "vis");
+    public Boolean datasetDeblur(int gpuNum, String taskId, String[] nameList, Integer type, Integer model) throws IOException {
+        String originDir = imgServerPath + "dataset/motion/" + (type == 0 ? "ir" : "vis");
         //创建文件夹
+        for (String s : nameList) {
+            logger.info(s);
+        }
         String dirName = imgServerPath + taskId;
         makeDir(dirName + "/blur");
         makeDir(dirName + "/sharp");
         //复制到新文件夹
         for (String imgName : nameList) {
-            String filePath = originDir + '/' + imgName;
-            cpFile(filePath, dirName);
+            String blurPath = originDir + "/blur/" + imgName;
+            String sharpPath = originDir + "/sharp/" + imgName;
+            cpFile(blurPath, dirName + "/blur");
+            cpFile(sharpPath, dirName + "/sharp");
         }
-        deblurProcess(dirName + "/blur", dirName + "/sharp", gpuNum);
+        deblurProcessSelect(dirName + "/blur", dirName + "/sharp", gpuNum, model);
         return true;
+    }
+
+    private void deblurProcessSelect(String blurDir, String sharpDir, int gpuNum, Integer model) throws IOException {
+        String[] shell = {shServerPath + "doDeblur.sh", blurDir, sharpDir, gpuNum + ""};
+        doShell(shell);
     }
 
     private void makeDir(String dirName) throws IOException {
@@ -165,6 +179,7 @@ public class DeblurService {
 
     private void cpFile(String fileName, String destDir) throws IOException {
         String[] shell = {"cp", fileName, destDir};
+        logger.info(Arrays.toString(shell));
         doShell(shell);
     }
 
@@ -188,5 +203,15 @@ public class DeblurService {
             res = line;
         }
         return res;
+    }
+
+    public String[] getImgList(String imgType, int datasetNum) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 1; i < datasetNum; i++) {
+            String dirPrefix = imgType.equals("vis") ? imgTomcatPath + "vis/blur/" : imgTomcatPath + "ir/blur/";
+            sb.append(dirPrefix).append(String.format("%06d", i)).append(".jpg#");
+        }
+        sb.append(String.format("%06d", datasetNum)).append(".jpg");
+        return sb.toString().split("#");
     }
 }

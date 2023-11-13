@@ -27,6 +27,7 @@ server:
   port: 8081
   imgServerPath: /stdStorage/taozi/deblur_sys/img/
   shServerPath: /stdStorage/taozi/deblur_sys/src/main/java/com/taozi/deblur/util/
+  imgTomcatPath: http://202.115.17.206:${server.port}/dataset/motion/
 
 centos:
   ip: 202.115.17.206

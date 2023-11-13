@@ -1,6 +1,11 @@
 package com.taozi.deblur.service;
 
+import com.taozi.deblur.controller.DeblurController;
 import com.taozi.deblur.pojo.GPUInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
@@ -11,6 +16,11 @@ import java.util.List;
 
 @Service
 public class GPUService {
+
+    @Autowired
+    RedisTemplate<String, Object> redisTemplate;
+
+    private static final Logger logger = LoggerFactory.getLogger(GPUService.class);
 
     private String getGPU() throws IOException {
         Process process = null;
@@ -35,7 +45,13 @@ public class GPUService {
             System.out.println(gpuInfo.getUsageRate());
             res.add(gpuInfo.getUsageRate() < 20);
         }
-        return res;
+        List<Boolean> gpuInfo = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            gpuInfo.add(!redisTemplate.hasKey("gpu" + i) && res.get(i));
+            logger.info(String.valueOf(redisTemplate.hasKey("gpu" + i)));
+        }
+        logger.info(gpuInfo.toString());
+        return gpuInfo;
     }
 
     private List<GPUInfo> getGPUInfo() throws IOException {
@@ -72,4 +88,13 @@ public class GPUService {
         return gpuInfoList;
     }
 
+    public int selectGPU() throws IOException {
+        List<Boolean> res = getGPUList();
+        for (int i = 0; i < res.size(); i++) {
+            if (res.get(i)) {
+                return i;
+            }
+        }
+        return -1;
+    }
 }

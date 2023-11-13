@@ -16,9 +16,12 @@ public class EvaService {
     private static final Logger logger = LoggerFactory.getLogger(EvaService.class);
     @Autowired
     private PrintStream commander;
+    @Autowired
+    private GPUService gpuService;
 
-    public String getImgValue(String imgName, int gpuNum, String taskId) throws IOException, JSchException {
+    public String getImgValue(String imgName, String taskId) throws IOException, JSchException {
         Process process = null;
+        int gpuNum = gpuService.selectGPU();
         String[] shell = {"/stdStorage/taozi/deblur_sys/src/main/java/com/taozi/deblur/util/getValue.sh", imgName, "" + gpuNum, taskId};
         process = Runtime.getRuntime().exec(shell);
         process.getOutputStream().close();

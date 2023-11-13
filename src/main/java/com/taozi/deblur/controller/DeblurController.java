@@ -120,15 +120,24 @@ public class DeblurController {
         return res;
     }
 
+//cd /home/tzx/.cache/JetBrains/RemoteDev/dist/5d97d7e529d1b_ideaIU-2023.2.2/plugins/remote-dev-server/bin/
 
     /**
      * type 0: ir
      * type 1: vis
+     * model 0: srn
+     * model 1: self
      **/
     @PostMapping("/datasetDeblur")
     @ResponseBody
     @CrossOrigin
-    public Boolean datasetDeblur(@RequestParam("gpuNum") int gpuNum, @RequestParam("taskId") String taskId, @RequestParam("nameList") List<String> nameList, @RequestParam("type") Integer type) throws IOException {
+    public Boolean datasetDeblur(@RequestParam("taskId") String taskId,
+                                 @RequestParam("type") Integer type, @RequestParam("model") Integer model,
+                                 @RequestParam("nameList") String... nameList) throws IOException {
+        int gpuNum = gpuService.selectGPU();
+        if (gpuNum < 0) {
+            logger.info("无空闲gpu");
+        }
         String key = "gpu" + gpuNum;
         Boolean absent = redisTemplate.opsForValue().setIfAbsent(key, 1);
         if (!absent) {
@@ -136,7 +145,7 @@ public class DeblurController {
         }
         logger.info(key + "已加锁");
         redisTemplate.expire(key, 30000, TimeUnit.MILLISECONDS);
-        Boolean res = deblurService.datasetDeblur(gpuNum, taskId, nameList, type);
+        Boolean res = deblurService.datasetDeblur(gpuNum, taskId, nameList, type, model);
         return res;
     }
 
@@ -170,25 +179,19 @@ public class DeblurController {
     @CrossOrigin
     public List<Boolean> testGPU() throws IOException {
         List<Boolean> gpuInfo = gpuService.getGPUList();
-        List<Boolean> res = new ArrayList<>();
-        for (int i = 0; i < 4; i++) {
-            res.add(!redisTemplate.hasKey("gpu" + i) && gpuInfo.get(i));
-            logger.info(String.valueOf(redisTemplate.hasKey("gpu" + i)));
-        }
-        logger.info(gpuInfo.toString());
-        return res;
+        return gpuInfo;
     }
 
     /**
      * 需和doDeblur使用同一块cpu
      * img的指标和图片异步返回，同时进行
      */
-    @PostMapping("/getImginfo")
+    @PostMapping("/getImgInfo")
     @ResponseBody
     @CrossOrigin
-    public String[] getImginfo(@RequestParam("gpuNum") int gpuNum, @RequestParam("imgName") String imgName, @RequestParam("taskId") String taskId) throws JSchException, IOException {
+    public String[] getImginfo(@RequestParam("imgName") String imgName, @RequestParam("taskId") String taskId) throws JSchException, IOException {
         logger.info("getImginfo:\t" + imgName + "\t" + taskId);
-        String imgValue = evaService.getImgValue(imgName, gpuNum, taskId);
+        String imgValue = evaService.getImgValue(imgName, taskId);
         return imgValue.split(",");
     }
 
@@ -243,13 +246,21 @@ public class DeblurController {
     /**
      * imgName 需全名
      */
-    @PostMapping("/showDemo")
+//    @PostMapping("/showDemo")
+//    @ResponseBody
+//    @CrossOrigin
+//    public String[] showDemo(@RequestParam("gpuNum") int gpuNum, @RequestParam("imgName") String imgName) throws JSchException, IOException {
+//        logger.info("showDemo:\t" + imgName);
+//        String imgValue = evaService.getImgValue(imgName, gpuNum, "demoTruth");
+//        return imgValue.split(",");
+//    }
+
+
+    @PostMapping("/imgList")
     @ResponseBody
     @CrossOrigin
-    public String[] showDemo(@RequestParam("gpuNum") int gpuNum, @RequestParam("imgName") String imgName) throws JSchException, IOException {
-        logger.info("showDemo:\t" + imgName);
-        String imgValue = evaService.getImgValue(imgName, gpuNum, "demoTruth");
-        return imgValue.split(",");
+    public String[] getImgList(@RequestParam("imgType") String imgType) {
+        int datasetNum = 7838;
+        return deblurService.getImgList(imgType, datasetNum);
     }
-
 }
